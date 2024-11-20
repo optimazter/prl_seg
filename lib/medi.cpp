@@ -1,0 +1,28 @@
+#include "medi.h"
+
+MEDI::MEDI(const std::string &matlabDir)
+{
+    this->matlabDir = matlabDir;
+    cmdPath = (std::filesystem::current_path() / "libs/MEDI/matlab_cmd.sh").string();
+    pdfPath = (std::filesystem::current_path() / "libs/MEDI").string();
+    
+}
+
+std::string MEDI::PDF(const std::string &inputT2PhasePath, const std::string &inputBETPath, const std::string &outputPath)
+{
+    std::string pdfCmd = std::format("MEDI_PDF('{}','{}','{}')", 
+        inputT2PhasePath, 
+        inputBETPath, 
+        outputPath
+    );
+    // std::string cmd = std::format(
+    //     "bash {} -f {} -p {} -c {}",
+    //     cmdPath, 
+    //     matlabDir,
+    //     pdfPath,
+    //     pdfCmd
+    // );
+    std::string cmd = std::format("{}/bin/matlab -nodisplay -nojvm -nosplash -r \"cd('{}');{};exit\"", matlabDir, pdfPath, pdfCmd);
+    return runCommand("PDF", outputPath, cmd);
+
+}
