@@ -1,14 +1,15 @@
-
-function MEDI_PDF(input_unwrapped_path, input_mask_path, output_path, voxel_size_x, voxel_size_y, voxel_size_z)
+function MEDI_PDF(input_path, input_mask_path, output_path, voxel_size_x, voxel_size_y, voxel_size_z)
 
     addpath("/home/adrian-hjertholm-voldseth/dev/MEDI_toolbox/functions")
 
+    [iField_raw] = niftiread(input_path);
     [iField_unwrapped] = niftiread(input_unwrapped_path);
-    [info] = niftiinfo(input_unwrapped_path);
+    [info] = niftiinfo(input_path);
     [mask] = niftiread(input_mask_path);
 
     %Add Echo dimension if not already there. For Single-Echo
-    if ndims(iField_unwrapped) < 4; iField_unwrapped(end, end, end, 1) = 0; end
+    if ndims(iField_raw) < 4; iField(end, end, end, 1) = 0; end
+    if ndims(iField_unwrapped) < 4; iField(end, end, end, 1) = 0; end
 
     dim = info.raw.dim;
     matrix_size = [dim(2), dim(3), dim(4), 1];
@@ -59,7 +60,7 @@ function MEDI_PDF(input_unwrapped_path, input_mask_path, output_path, voxel_size
     B0 = rotmat \ B0_dir;
 
     %[iField_corrected] = iField_correction(iField, voxel_size, mask);
-    [iFreq_raw, N_std] = Fit_ppm_complex(iField_unwrapped);
+    [iFreq_raw, N_std] = Fit_ppm_complex(iField_raw);
 
     %   input to PDF:
     %   iFreq - the unwrapped field map
@@ -69,9 +70,4 @@ function MEDI_PDF(input_unwrapped_path, input_mask_path, output_path, voxel_size
     %   voxel_size - the size of the voxel in mm
     %   B0_dir - the direction of the B0 field
     %   tol(optional) - tolerance level
-
-    [RDF shim] = PDF(iField_unwrapped, N_std, mask, matrix_size, voxel_size, B0);
-
-    niftiwrite(RDF, output_path);
-
-end
+    

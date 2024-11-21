@@ -43,7 +43,7 @@ int JULIA_RUN()
 
 
 
-int c_romeo(const char* inputPhasePath,  const char* outputPath)
+int c_romeo(const char* inputPhasePath, const char* inputMaskPath, const char* outputPath)
 {
     char cmdBuff[256] = {};
 
@@ -51,7 +51,10 @@ int c_romeo(const char* inputPhasePath,  const char* outputPath)
     sprintf(cmdBuff, "phase = readphase(\"%s\")", inputPhasePath);
     handle_eval_string(cmdBuff);
 
-    handle_eval_string("unwrapped = unwrap(phase)");
+    sprintf(cmdBuff, "mask = readmag(\"%s\")", inputMaskPath);
+    handle_eval_string(cmdBuff);
+
+    handle_eval_string("unwrapped = romeo(phase)");
 
     sprintf(cmdBuff, "savenii(unwrapped, \"%s\")", outputPath);
     handle_eval_string(cmdBuff);

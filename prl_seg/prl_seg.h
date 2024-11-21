@@ -17,6 +17,6 @@ namespace PRLSeg
 {
 
 
-    void QSM(const std::filesystem::path &inputPhasePath, const std::filesystem::path &outDir);
+    void QSM(const std::filesystem::path &inputPhasePath, const std::filesystem::path &outDir, const double &voxelSize, const double &voxelSizeY = 0, const double &voxelSizeZ = 0);
 
 }

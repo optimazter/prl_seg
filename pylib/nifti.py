@@ -68,7 +68,7 @@ def plot_nifti_on_ax(axis: plt.axes, path: str, title: str, idx = 100):
     img_nifti_arr = sitk.GetArrayFromImage(img)
     ax.set_title(title)
     ax.imshow(img_nifti_arr[..., idx], cmap = "gray")
-    plt.axis('off')
+    ax.set_axis_off()
 
 
 def plot_nifti(nifti_img: torch.Tensor = None, mask: torch.Tensor = None, title: str = None):
