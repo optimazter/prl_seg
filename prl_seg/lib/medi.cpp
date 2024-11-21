@@ -8,20 +8,13 @@ MEDI::MEDI(const std::string &matlabDir)
     
 }
 
-std::string MEDI::PDF(const std::string &inputT2PhasePath, const std::string &inputBETPath, const std::string &outputPath)
+std::string MEDI::PDF(const std::string &inputT2PhasePath, const std::string &inputMaskPath,  const std::string &outputPath)
 {
     std::string pdfCmd = std::format("MEDI_PDF('{}','{}','{}')", 
         inputT2PhasePath, 
-        inputBETPath, 
+        inputMaskPath, 
         outputPath
     );
-    // std::string cmd = std::format(
-    //     "bash {} -f {} -p {} -c {}",
-    //     cmdPath, 
-    //     matlabDir,
-    //     pdfPath,
-    //     pdfCmd
-    // );
     std::string cmd = std::format("{}/bin/matlab -nodisplay -nojvm -nosplash -r \"cd('{}');{};exit\"", matlabDir, pdfPath, pdfCmd);
     return runCommand("PDF", outputPath, cmd);
 

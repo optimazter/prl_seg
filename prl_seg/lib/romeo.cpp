@@ -9,7 +9,7 @@ ROMEO::ROMEO()
     JULIA_RUN();
 }
 
-std::string ROMEO::romeo(const std::string &inputPhasePath, const std::string &inputMagPath, const std::string &outputPath)
+std::string ROMEO::romeo(const std::string &inputPhasePath, const std::string &outputPath)
 {
 
     std::cout << "Running ROMEO\n";
@@ -18,6 +18,6 @@ std::string ROMEO::romeo(const std::string &inputPhasePath, const std::string &i
         std::cout << "Output path " << outputPath << " already exists, returning it instead. \n";
         return outputPath;
     }
-    c_romeo(inputPhasePath.c_str(), inputMagPath.c_str(), outputPath.c_str());
+    c_romeo(inputPhasePath.c_str(), outputPath.c_str());
     return outputPath;
 }

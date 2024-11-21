@@ -1,16 +1,19 @@
+
 function MEDI_PDF(input_path, input_mask_path, output_path)
 
     addpath("/home/adrian-hjertholm-voldseth/dev/MEDI_toolbox/functions")
 
-    iField = niftiread(input_path);
-    mask = niftiread(input_mask_path);
-    info = niftiinfo(input_path);
+    [iField] = niftiread(input_path);
+    [info] = niftiinfo(input_path);
+    [mask] = niftiread(input_mask_path);
 
     dim = info.raw.dim;
     matrix_size = [dim(1), dim(2), dim(3)];
     
     pix_dim = info.raw.pixdim;
     voxel_size = [pix_dim(1), pix_dim(2), pix_dim(3)];
+
+
 
     %Calculate quaternion
     quatern_b = info.raw.quatern_b;
@@ -43,8 +46,17 @@ function MEDI_PDF(input_path, input_mask_path, output_path)
 
     %[iField_corrected] = iField_correction(iField, voxel_size, mask);
     [iFreq_raw, N_std] = Fit_ppm_complex(iField);
-    pdf = PDF(iFreq_raw, N_std, mask, matrix_size, voxel_size, B0);
 
-    niftiwrite(pdf, output_path);
+    %   input to PDF:
+    %   iFreq - the unwrapped field map
+    %   N_std - the noise standard deviation on the field map. (1 over SNR for single echo)
+    %   Mask - a binary 3D matrix denoting the Region Of Interest
+    %   matrix_size - the size of the 3D matrix
+    %   voxel_size - the size of the voxel in mm
+    %   B0_dir - the direction of the B0 field
+    %   tol(optional) - tolerance level
+    [RDF] = PDF(iFreq_raw, N_std, mask, matrix_size, voxel_size, B0);
+
+    niftiwrite(RDF, output_path);
 
 end

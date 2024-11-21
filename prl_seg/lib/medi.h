@@ -12,7 +12,7 @@ class MEDI
 
 public:
     MEDI(const std::string &matlabDir);
-    std::string PDF(const std::string &inputT2PhasePath, const std::string &inputBETPath, const std::string &outputPath);
+    std::string PDF(const std::string &inputT2PhasePath, const std::string &inputMaskPath, const std::string &outputPath);
 
 private:
     std::string matlabDir;
