@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib.animation import FuncAnimation
 from matplotlib import patches
+
 import SimpleITK as sitk
 import numpy as np
 import torch 
@@ -9,9 +11,11 @@ import pylib.nifti as nii
 import numpy as np
 import os
 import torchviz  as vz
+import types
 
 
 DEFAULT_COLORS = [mcolors.to_rgba(c, alpha=0.4) for c, _ in mcolors.BASE_COLORS.items()]
+
 
 def plot_color_description_box_on_ax(axis: plt.axes, box_width = 90, box_height = 50, padding = 10, colors = [], descriptions = []):
     ax = axis
@@ -85,17 +89,6 @@ def plot_nifti_on_ax(axis: plt.axes, img = None, mask = None, mask_colors = DEFA
 
         if k_rot90 != 0:
             mask_img = F.rotate(mask_img, k_rot90)
-    
-        print(mask_img.shape)
-    
-    if img is None:  
-        ax.imshow(mask_img)
-    elif mask is None:
-        ax.imshow(img, cmap = cmap)
-    else:
-        ax.imshow(img, cmap = cmap)
-        ax.imshow(mask_img)
-    
     if mask_legend and C > 0:
         assert(len(mask_legend) == C)
         plot_color_description_box_on_ax(ax, colors=mask_colors[:C], descriptions=mask_legend)
@@ -129,5 +122,53 @@ def plot_nifti_mask(img_path: str, mask_path: str, title: str = None, idx = 100)
     plt.show()
 
 
+
+
+
+def plot_loss(f):
+
+    assert(isinstance(f, types.GeneratorType), "Decorated function must be a generator which yields the training and validation loss during training")
+
+    def wrapper(*args, **kwargs):
+
+        fig, ax = plt.subplots()
+        train_line = ax.plot([], [], label="Training Loss")
+        val_line= ax.plot([], [], label="Validation Loss")
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Loss")
+        ax.legend()
+        ax.grid()
+        plt.show()
+
+        all_train_loss = []
+        all_val_loss = []
+        train_iter = []
+        val_iter = []
+
+        for output in f(*args, **kwargs):
+
+            assert(isinstance(output, tuple) and len(output) == 2, "Output of function must be a tuple of yielded loss and a description: 'Train' or 'Val' ")
+            loss, desc = output
+            assert(isinstance(loss, float) and desc in ["Train", "Val"])
+
+            if desc == "Train":
+                all_train_loss.append(loss)
+                train_iter.append(len(all_train_loss))
+            elif desc == "Val":
+                all_val_loss.append(loss)
+                val_iter.append(len(all_val_loss))
+
+            train_line.set_data(iter, all_train_loss)
+            val_line.set_data(iter, all_val_loss)
+
+            ax.relim()
+            ax.autoscale_view()
+
+            plt.draw()
+            plt.pause(0.001)
+
+        return all_train_loss, all_val_loss
+
+    return wrapper
 
 

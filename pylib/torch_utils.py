@@ -1,10 +1,13 @@
 import torch
 from torch import nn
+import torch.functional as F
 from rich.progress import Progress
+#from vis import plot_loss
 
 
 
 
+#@plot_loss
 def train(model, train_loader, val_loader, loss_fn, optimizer, epochs, device):
 
     model = model.to(device)
@@ -22,12 +25,16 @@ def train(model, train_loader, val_loader, loss_fn, optimizer, epochs, device):
             loss_train, loss_val = 0.0, 0.0
 
             for img, label in train_loader:
+                print(img.shape)
+                print(label.shape)
                 img = img.to(device)
                 label = label.to(device)
 
                 outputs = model(img)
                 loss = loss_fn(outputs, label)
                 loss_train += loss.item()
+
+                yield(loss.item(), "Train")
 
                 loss.backward()
                 optimizer.step()
@@ -42,6 +49,8 @@ def train(model, train_loader, val_loader, loss_fn, optimizer, epochs, device):
                     outputs = model(img)
                     loss = loss_fn(outputs, label)
                     loss_val += loss.item()
+
+                    yield(loss_val.item(), "Val")
 
 
             loss_train = loss_train / len(train_loader)
@@ -61,7 +70,7 @@ class DiceLoss(nn.Module):
 
     def __init__(self, num_classes):
         super().__init__()
-        self.num_classes = 0
+        self.num_classes = num_classes
 
 
     def forward(self, prediction, label):
@@ -70,4 +79,25 @@ class DiceLoss(nn.Module):
         assert(C == self.num_classes)
 
         prediction = torch.softmax(prediction, 1)
+        
 
+
+class ShapeAwareCrossEntropyLoss(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.cross_entropy = nn.CrossEntropyLoss()
+
+
+    def forward(x, logits, targets):
+
+        N, C, H , W = targets.shape
+        # Calculate log probabilities
+        logp = F.log_softmax(logits, dim = 1)
+        # Gather log probabilities with respect to target
+        logp = logp.gather(1, targets)
+
+        return - 1 * logp.sum(1) * F.cross_entropy(
+            logits,
+            targets,
+        )

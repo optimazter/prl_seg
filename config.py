@@ -13,7 +13,7 @@ PATH_TRAINING_DATASET = "output/train_dataset.pt"
 PATH_VALIDATION_DATASET = "output/val_dataset.pt"
 PATH_TEST_DATASET = "output/test_dataset.pt"
 
-PATH_DATASET = "output/dataset.pt"
+PATH_RAW_DATASET = "output/dataset.pt"
 PATH_MODEL = "output/model.pt"
 
 #Training parameters
