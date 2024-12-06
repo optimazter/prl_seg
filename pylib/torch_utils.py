@@ -25,8 +25,6 @@ def train(model, train_loader, val_loader, loss_fn, optimizer, epochs, device):
             loss_train, loss_val = 0.0, 0.0
 
             for img, label in train_loader:
-                print(img.shape)
-                print(label.shape)
                 img = img.to(device)
                 label = label.to(device)
 

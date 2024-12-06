@@ -21,4 +21,4 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_SIZE = 2
 SEED = 24
 EPOCHS = 10
-TRAINING_SPLIT, VALIDATION_SPLIT, TEST_SPLIT = 0.8, 0.1, 0.1
+TRAIN_VAL_TEST_SPLIT = [0.8, 0.1, 0.1]

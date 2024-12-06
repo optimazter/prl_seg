@@ -73,7 +73,15 @@ void createLesionDataset(const fs::path &loadDir, const fs::path &saveDir, const
 
     labelsTen = torch::stack({allLesionsTenFlipped, PRLsTenFlipped});
 
-    torch::save({imagesTenFlipped, labelsTen}, saveDir / "dataset.pt");
+    //Adding a channel dimension of 1 to images.
+    auto imagesTenUnsqueezed = torch::unsqueeze(imagesTenFlipped, DIM_N);
+
+    //Reshape images and labels to be of expected shape (N, C, H, W)
+    auto imagesTenPermuted = torch::permute(imagesTenUnsqueezed, {1, 0, 2, 3});
+    auto labelsTenPermuted = torch::permute(labelsTen, {1, 0, 2, 3});
+
+
+    torch::save({imagesTenPermuted, labelsTenPermuted}, saveDir / "dataset.pt");
     std::cout << "Dataset creation was successful!\n";
 }
 
