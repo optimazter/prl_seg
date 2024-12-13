@@ -1,0 +1,6 @@
+build
+assets
+output
+__pycache__/
+prl_seg/build
+.vscode
