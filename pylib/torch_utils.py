@@ -13,7 +13,7 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import apply_ac
 
 class Trainer:
 
-    def __init__(self, log_file = "logs/log.csv", save_dir = "output"):
+    def __init__(self, log_file, save_dir):
         self.log_file = log_file
         self.save_dir = save_dir
         assert(os.path.isdir(self.save_dir))
