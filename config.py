@@ -1,7 +1,7 @@
 import torch
 
 #Loaded files
-ORIG_PATH = "E:/Lou_et_al_dataset"
+ORIG_PATH = "assets/Lou_et_al_dataset"
 FLAIR = "flair_pp.nii.gz"
 PHASE = "phase_pp.nii.gz"
 PHASE_UNWRAPPED_UBMASK = "phase_unwrapped_ubmask.nii.gz"
@@ -9,14 +9,20 @@ SEG_2_PHASE = "seg2phase.nii.gz"
 T1 = "t1_pp.nii.gz"
 
 #Generated files
-PATH_TRAINING_DATASET = "E:/train_dataset.pt"
-PATH_VALIDATION_DATASET = "E:/val_dataset.pt"
-PATH_TEST_DATASET = "E:/test_dataset.pt"
-
+PATH_TRAINING_DATASET = "output/train_dataset.pt"
+PATH_VALIDATION_DATASET = "output/val_dataset.pt"
+PATH_TEST_DATASET = "output/test_dataset.pt"
 PATH_RAW_DATASET = "output/dataset.pt"
 
-OUT_DIR = "E:"
-PATH_LOG = "E:/log.csv"
+#Zipped files for google collab
+PATH_TRAINING_DATASET_ZIP = "train_dataset.zip"
+PATH_VALIDATION_DATASET_ZIP = "val_dataset.zip"
+PATH_TEST_DATASET_ZIP = "test_dataset.zip"
+
+
+
+OUT_DIR = "output"
+PATH_LOG = "output/log.csv"
 
 #Training parameters
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
