@@ -1,0 +1,23 @@
+FANSI Benchmark Data.
+
+                                                                                  TKD       NDI     nlTGV comp_xsim imagesc3d
+Precision 5820, Windows(R), Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz         4.61721   1.60678   3.46207   7.99310  15.88755
+	12 cores, Microsoft Windows 11 Pro Insider Preview, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz, 64 GB RAM, Quadro RTX 4000,  MATLAB 9.9.0.1524771 (R2020b) Update 2
+Precision 5820, Windows(R), Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz         4.42966  24.34345  45.35492   7.76909  15.32278
+	12 cores, Microsoft Windows 11 Pro Insider Preview, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz, 64 GB RAM, MATLAB 9.9.0.1524771 (R2020b) Update 2
+Precision 5820, Linux, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz              4.17488   1.51006   3.44485   7.75674  16.11561
+	12 cores, Ubuntu 20.04.3 LTS, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz, 64 GB RAM, Quadro RTX 4000,  MATLAB 9.11.0.1769968 (R2021b)
+Precision 5820, Linux, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz              4.40203  22.36797  37.04699   8.06884  16.11537
+	12 cores, Ubuntu 20.04.3 LTS, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz, 64 GB RAM, MATLAB 9.11.0.1769968 (R2021b)
+Mac Mini, macOS Monterey, Apple M1 @ 2.4GHz                                   4.84884  21.59620  40.20464  28.65888  15.66817
+	8 cores, Darwin 21.2.0, Apple M1 @ 2.4GHz, 16 GB RAM, MATLAB 9.10.0.1602886 (R2021a)
+Precision 5820, Linux, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz              4.16292   4.07347   8.87341   7.61659  15.58617
+	24 cores, Ubuntu 20.04.3 LTS, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz, 64 GB RAM, Quadro P2000,  MATLAB 9.11.0.1809720 (R2021b) Update 1
+Precision 5820, Linux, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz              4.39100  20.83262  36.37757   7.80304  15.62247
+	24 cores, Ubuntu 20.04.3 LTS, Intel(R) Core(TM) i9-10920X CPU @ 3.50GHz, 64 GB RAM, MATLAB 9.11.0.1809720 (R2021b) Update 1
+MSI GF75, Linux, Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz                     4.51065   6.27963  10.44590  12.24535  15.34040
+	12 cores, Fedora Linux 35, Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz, 32 GB RAM, NVIDIA GeForce GTX 1650,  MATLAB 9.6.0.1114505 (R2019a) Update 2
+MSI GF75, Linux, Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz                     4.46920  24.72514  54.59046  13.81614  14.45657
+	12 cores, Fedora Linux 35, Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz, 32 GB RAM, MATLAB 9.6.0.1114505 (R2019a) Update 2
+Precision 3640, Windows(R), Intel(R) Core(TM) i9-10900K CPU @ 3.70GHz         3.48661  17.55485  36.82211  6.86929   14.30688
+    10 cores, Microsoft Windows 10 Pro, Intel(R) Core(TM) i9-10900K CPU @ 3.70GHz, 64 GB RAM, MATLAB 9.9.0.1495850 (R2020b) Update 1
