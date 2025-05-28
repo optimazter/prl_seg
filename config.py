@@ -31,10 +31,13 @@ PATH_VAL_SWI_DATASET = "output/val_swi_dataset.pt"
 PATH_TEST_SWI_DATASET = "output/test_swi_dataset.pt"
 
 DIR_TRAIN_SWI_DATASET = "output/train_swi_dataset"
-DIR_VAL_SWI_DATASET = "output/val_swi_dataset"
-DIR_TEST_SWI_DATASET = "output/test_swi_dataset"
+DIR_VAL_SWI_DATASET =     "output/val_swi_dataset"
+DIR_TEST_SWI_DATASET =   "output/test_swi_dataset"
 
 
+DIR_TRAIN_SWI_DATASET_3D = "output/train_swi_dataset_3d"
+DIR_VAL_SWI_DATASET_3D = "output/val_swi_dataset_3d"
+DIR_TEST_SWI_DATASET_3D = "output/test_swi_dataset_3d"
 
 
 OUT_DIR = "output"

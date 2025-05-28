@@ -8,47 +8,52 @@ from torch import nn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.checkpoint import checkpoint
 
 
 
 
-class UNet3d(nn.Module):
+class PRLUNet3D(nn.Module):
 
-    def __init__(self, n_channels, n_classes, use_checkpoint=True):
+    def __init__(self, n_channels, n_classes):
         super().__init__()
-
-        self.use_checkpoint = use_checkpoint
 
         self.n_channels = n_channels
         self.n_classes = n_classes
 
-        self.in_conv = self.build_double_conv(n_channels, 64)
+        self.in_conv1 = self.build_double_conv(n_channels, 32)
+        self.in_conv2 = self.build_double_conv(n_channels, 32)
 
-        self.down1 = self.build_down_conv(64, 128)
-        self.down2 = self.build_down_conv(128, 256)
-        self.down3 = self.build_down_conv(256, 512)
-        self.down4 = self.build_down_conv(512, 1024)
+        self.down11 = self.build_down_conv(32, 64)
+        self.down12 = self.build_down_conv(64, 128)
+        self.down13 = self.build_down_conv(128, 256)
+        self.down14 = self.build_down_conv(256, 512)
 
-        self.up1 = nn.ConvTranspose3d(1024, 512, kernel_size=2, stride=2) 
-        self.conv1 = self.build_double_conv(1024, 512)
-        self.up2 =nn.ConvTranspose3d(512, 256, kernel_size=2, stride=2)
-        self.conv2 = self.build_double_conv(512, 256)
-        self.up3 = nn.ConvTranspose3d(256, 128, kernel_size=2, stride=2)
-        self.conv3 = self.build_double_conv(256, 128)
-        self.up4 = nn.ConvTranspose3d(128, 64, kernel_size=2, stride=2)
-        self.conv4 = self.build_double_conv(128, 64)
+        self.down21 =  self.build_down_conv(32, 64)
+        self.down22 = self.build_down_conv(64, 128)
+        self.down23 = self.build_down_conv(128, 256)
+        self.down24 = self.build_down_conv(256, 512)
 
-        self.head = nn.Conv3d(64, n_classes, kernel_size=1)
+        self.fuse = nn.Conv3d(512 * 2, 512, kernel_size=1)
+
+
+        self.up21 = nn.ConvTranspose3d(512, 256, kernel_size=2, stride=2)
+        self.conv21 = self.build_double_conv(512, 256)
+        self.up22 = nn.ConvTranspose3d(256, 128, kernel_size=2, stride=2)
+        self.conv22 = self.build_double_conv(256, 128)
+        self.up23 = nn.ConvTranspose3d(128, 64, kernel_size=2, stride=2)
+        self.conv23 = self.build_double_conv(128, 64)
+        self.up24 = nn.ConvTranspose3d(64, 32, kernel_size=2, stride=2)
+        self.conv24 = self.build_double_conv(64, 32)
+
+
+        self.head = nn.Conv3d(32, n_classes, kernel_size=1)
 
 
     def pad(self, x1, x2):
-        diffZ = x2.size()[2] - x1.size()[2]
-        diffY = x2.size()[3] - x1.size()[3]
-        diffX = x2.size()[4] - x1.size()[4]
+        diffY = x2.size()[2] - x1.size()[2]
+        diffX = x2.size()[3] - x1.size()[3]
         return F.pad(x1, [diffX // 2, diffX - diffX // 2,
-                          diffY // 2, diffY - diffY // 2,
-                          diffZ // 2, diffZ - diffZ // 2])
+                        diffY // 2, diffY - diffY // 2])
 
     def build_down_conv(self, in_channels, out_channels):
         return nn.Sequential(
@@ -65,68 +70,52 @@ class UNet3d(nn.Module):
             nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True)
         )
+    
 
 
-    def forward(self, x):
-        d1 = self.in_conv(x)
-        if self.use_checkpoint:
-            d2 = checkpoint(self.down1, d1)
-            d3 = checkpoint(self.down2, d2)
-            d4 = checkpoint(self.down3, d3)
-            d5 = checkpoint(self.down4, d4)
-        else:
-            d2 = self.down1(d1)
-            d3 = self.down2(d2)
-            d4 = self.down3(d3)
-            d5 = self.down4(d4)
+    def forward(self, mag, phase):
 
-        if self.use_checkpoint:
-            u1 = checkpoint(self.up1, d5)
-            u1 = self.pad(u1, d4)
-            x = torch.cat([d4, u1], dim=1)
-            x = checkpoint(self.conv1, x)
-        else:
-            u1 = self.up1(d5)
-            u1 = self.pad(u1, d4)
+        d11 = self.in_conv1(mag)
+        d12 = self.down11(d11)
+        d13 = self.down12(d12)
+        d14 = self.down13(d13)
+        d15 = self.down14(d14)
 
-            x = torch.cat([d4, u1], dim=1)
-            x = self.conv1(x)
+        d21 = self.in_conv2(phase)
+        d22 = self.down21(d21) 
+        d23 = self.down22(d22)
+        d24 = self.down23(d23)
+        d25 = self.down24(d24)
 
-        if self.use_checkpoint:
-            u2 = checkpoint(self.up2, x)
-            u2 = self.pad(u2, d3)
-            x = torch.cat([d3, u2], dim=1)
-            x = checkpoint(self.conv2, x)
-        else:
-            u2 = self.up2(x)
-            u2 = self.pad(u2, d3)
-            x = torch.cat([d3, u2], dim=1)
-            x = self.conv2(x)
+        #Adding spatial connection between the two branches
+        fuse = torch.cat([d25, d15], dim=1)
+        fuse = self.fuse(fuse)
+
+        u21 = self.up21(fuse)
+        u21 = self.pad(u21, d24)    
+        x2 = torch.cat([d24, u21], dim=1)
+        x2 = self.conv21(x2)
+
+        u22 = self.up22(x2)
+        u22 = self.pad(u22, d23)
+        x2 = torch.cat([d23, u22], dim=1)
+        x2 = self.conv22(x2)
+
+        u23 = self.up23(x2)
+        u23 = self.pad(u23, d22)
+        x2 = torch.cat([d22, u23], dim=1)
+        x2 = self.conv23(x2)
+
+        u24 = self.up24(x2)
+        u24 = self.pad(u24, d21)
+        x2 = torch.cat([d21, u24], dim=1)
+        x2 = self.conv24(x2)
+
+        out2 = self.head(x2)
+        return out2
+
+
         
-        if self.use_checkpoint:
-            u3 = checkpoint(self.up3, x)
-            u3 = self.pad(u3, d2)
-            x = torch.cat([d2, u3], dim=1)
-            x = checkpoint(self.conv3, x)
-        else:
-            u3 = self.up3(x)
-            u3 = self.pad(u3, d2)
-            x = torch.cat([d2, u3], dim=1)
-            x = self.conv3(x)
-
-        if self.use_checkpoint:
-            u4 = checkpoint(self.up4, x)
-            u4 = self.pad(u4, d1)
-            x = torch.cat([d1, u4], dim=1)
-            x = checkpoint(self.conv4, x)
-        else:
-            u4 = self.up4(x)
-            u4 = self.pad(u4, d1)
-            x = torch.cat([d1, u4], dim=1)
-            x = self.conv4(x)
-
-        out = self.head(x)
-        return out
 
 
     

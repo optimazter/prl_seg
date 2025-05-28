@@ -20,6 +20,162 @@ from monai.transforms import (
     NormalizeIntensity,
 )
 import monai.utils.type_conversion as type_conversion
+from imblearn.over_sampling import SMOTE
+
+
+def create_star_dataset_3d(
+        patient_dirs: Type[List[str]],
+        flair_fname: str,
+        phase_fname: str,
+        lesion_fname: str,
+        prl_fname: str,
+        save_train_dir: str,
+        save_val_dir: str,
+        save_test_dir: str,
+        num_val_samples: int = 1,
+        num_test_samples: int = 2,
+        sub_voxel_size: list = [16, 64, 64],
+    ):
+
+    if not os.path.exists(save_train_dir):
+        os.makedirs(save_train_dir)
+    if not os.path.exists(save_test_dir):
+        os.makedirs(save_test_dir)
+    if not os.path.exists(save_val_dir):
+        os.makedirs(save_val_dir)
+
+    with Progress() as progress:
+
+        n_patients = len(patient_dirs)
+
+        #Calculate mean and std of the training set
+        stat_task = progress.add_task("Calculating mean and std for training images...", total=n_patients)
+        mean_flair, std_flair = 0.0, 0.0
+        for i, patient_dir in enumerate(patient_dirs):
+            # Skip test samples
+            if i < num_test_samples:
+                continue
+            flair_ten, phase_ten = dataset.process_patient(patient_dir, [flair_fname, phase_fname])
+            if i == 0:
+                mean_flair = flair_ten.mean()
+                std_flair = flair_ten.std()
+            else:
+                mean_flair = (mean_flair * i + flair_ten.mean()) / (i + 1)
+                std_flair = (std_flair * i + flair_ten.std()) / (i + 1)
+
+            progress.update(stat_task, advance=1)
+            progress.refresh()
+
+
+        flair_normalizer = NormalizeIntensity(subtrahend=mean_flair, divisor=std_flair)
+
+        progress.remove_task(stat_task)
+
+
+        task = progress.add_task("Loading data", total=n_patients)
+        for i, patient_dir in enumerate(patient_dirs):
+
+            progress.update(task, description=f"Loading data for patient {patient_dir}...")
+            progress.refresh()
+
+            flair_ten, phase_ten, lesions_ten, prl_ten = dataset.process_patient(patient_dir, [flair_fname, phase_fname, lesion_fname, prl_fname])
+
+            if phase_ten is not None and lesions_ten is not None and prl_ten is not None:
+                
+                D, H, W = phase_ten.shape[1:]
+
+                # Create binary masks for lesions and PRLs
+                lesions_ten[lesions_ten > 0] = 1
+                prl_ten[prl_ten > 0] = 1
+                
+                # Remove the first dimension of the tensors
+                lesions_ten = lesions_ten.squeeze(0)
+                prl_ten = prl_ten.squeeze(0)
+
+                #Normalize the images
+                flair_ten = flair_normalizer(flair_ten)
+
+                progress.update(task, description="Creating mask...")
+
+                clusters_lesions = lt.get_clusters_3d(lesions_ten)
+                clusters_prl = zip(*torch.nonzero(prl_ten, as_tuple=True))
+
+                clusters_prl_expanded = lt.get_overlapping_clusters_from_central_lines(clusters_lesions, clusters_prl)
+
+                lesions_mask_t = lt.get_mask_from_clusters(clusters_lesions, lesions_ten.shape)
+                prl_mask_t = lt.get_mask_from_clusters(clusters_prl_expanded, prl_ten.shape)
+                
+                #Subtract PRLs from lesions
+                lesions_mask_t[prl_mask_t > 0] = 0
+
+                background_mask_t = 1 - lesions_mask_t - prl_mask_t
+                mask_ten = torch.stack([background_mask_t, lesions_mask_t, prl_mask_t])
+
+                progress.update(task, description="Transforming data..")
+
+
+                phase_mask = transforms.create_phase_mask(phase_ten, n = 4)
+                star_img = flair_ten * phase_mask
+
+                assert(star_img.dim() == 4), f"SWI image has {star_img.dim()} dimensions, expected 4!"
+                assert(mask_ten.dim() == 4), f"Mask image has {mask_ten.dim()} dimensions, expected 4!"
+                assert(phase_ten.dim() == 4), f"Phase image has {phase_ten.dim()} dimensions, expected 4!"
+            
+
+                # Split the image into 3D slices
+
+                d_interval = sub_voxel_size[0] // 2
+                h_interval = sub_voxel_size[1] // 2
+                w_interval = sub_voxel_size[2] // 2
+
+                pad = [4, 4, 4, 4] 
+
+                phase_ten = torch.nn.functional.pad(phase_ten, pad, mode='constant', value=0)
+                star_img = torch.nn.functional.pad(star_img, pad, mode='constant', value=0)
+                mask_ten = torch.nn.functional.pad(mask_ten, pad, mode='constant', value=0)
+
+                phase_samples = []
+                star_samples = []
+                mask_samples = []
+
+                progress.update(task, description="Creating sub samples...")
+
+                for d in range(0, D - d_interval, d_interval):  # Start at 0 and step by d_interval
+                    for h in range(0, H - h_interval, h_interval):  # Start at 0 and step by h_interval
+                        for w in range(0, W - w_interval, w_interval):  # Start at 0 and step by w_interval
+                            roi_center = [d + d_interval, h + h_interval, w + w_interval]
+                            crop = SpatialCrop(roi_size=sub_voxel_size, roi_center=roi_center)
+                            
+                            phase_samples.append(crop(phase_ten))
+                            star_samples.append(crop(star_img))
+                            mask_samples.append(crop(mask_ten))
+
+                phase_ten = torch.stack(phase_samples)
+                star_img= torch.stack(star_samples)
+                mask_ten = torch.stack(mask_samples)
+
+
+                #Permute from [N, C, D, H, W] to [N, C, H, W, D]
+                star_img = star_img.permute(0, 1, 3, 4, 2)
+                mask_ten = mask_ten.permute(0, 1, 3, 4, 2)
+                phase_ten = phase_ten.permute(0, 1, 3, 4, 2)
+
+                if i < num_test_samples:
+                    torch.save([star_img, phase_ten, mask_ten], f"{save_test_dir}/{i}.pt")
+                elif i < num_test_samples + num_val_samples:
+                    torch.save([star_img, phase_ten, mask_ten], f"{save_val_dir}/{i}.pt")
+                else:
+                    torch.save([star_img, phase_ten, mask_ten], f"{save_train_dir}/{i}.pt")
+                
+                progress.update(task, advance=1)
+                progress.refresh()
+
+        progress.update(task, description="Loading data complete!")
+
+
+
+
+
 
 
 
@@ -127,7 +283,6 @@ def create_star_dataset(
 
                 if i < num_test_samples:
                     torch.save([star_img, phase_ten, mask_ten], f"{save_test_dir}/{i}.pt")
-                    break
                 else:
                     if augment_prl:
                         progress.update(task, description="Augmenting training data...")
@@ -145,27 +300,17 @@ def create_star_dataset(
 
 
 
-def create_star_dataset_3d(
+
+def create_star_dataset_2(
         patient_dirs: Type[List[str]],
         flair_fname: str,
         phase_fname: str,
         lesion_fname: str,
         prl_fname: str,
-        save_train_dir: str,
-        save_val_dir: str,
+        save_train_val_dir: str,
         save_test_dir: str,
-        augment: bool = True,
-        num_val_samples: int = 2,
-        num_test_samples: int = 1,
-        crop: SpatialCrop = None,
+        num_test_samples: int = 1
     ):
-
-    if not os.path.exists(save_train_dir):
-        os.makedirs(save_train_dir)
-    if not os.path.exists(save_val_dir):
-        os.makedirs(save_val_dir)
-    if not os.path.exists(save_test_dir):
-        os.makedirs(save_test_dir)
 
 
     with Progress() as progress:
@@ -174,22 +319,27 @@ def create_star_dataset_3d(
 
         #Calculate mean and std of the training set
         stat_task = progress.add_task("Calculating mean and std for training images...", total=n_patients)
-        mean, std = 0.0, 0.0
+        mean_flair, std_flair = 0.0, 0.0
         for i, patient_dir in enumerate(patient_dirs):
-
-            flair_ten = dataset.process_patient(patient_dir, [flair_fname])[0]
+            # Skip test samples
+            if i < num_test_samples:
+                continue
+            flair_ten, phase_ten = dataset.process_patient(patient_dir, [flair_fname, phase_fname])
             if i == 0:
-                mean = flair_ten.mean()
-                std = flair_ten.std()
+                mean_flair = flair_ten.mean()
+                std_flair = flair_ten.std()
             else:
-                mean = (mean * i + flair_ten.mean()) / (i + 1)
-                std = (std * i + flair_ten.std()) / (i + 1)
+                mean_flair = (mean_flair * i + flair_ten.mean()) / (i + 1)
+                std_flair = (std_flair * i + flair_ten.std()) / (i + 1)
 
             progress.update(stat_task, advance=1)
             progress.refresh()
 
 
-        normalizer = NormalizeIntensity(subtrahend=mean, divisor=std)
+        flair_normalizer = NormalizeIntensity(subtrahend=mean_flair, divisor=std_flair)
+
+        progress.remove_task(stat_task)
+
 
         task = progress.add_task("Loading data", total=n_patients)
         for i, patient_dir in enumerate(patient_dirs):
@@ -200,16 +350,32 @@ def create_star_dataset_3d(
             flair_ten, phase_ten, lesions_ten, prl_ten = dataset.process_patient(patient_dir, [flair_fname, phase_fname, lesion_fname, prl_fname])
 
             if phase_ten is not None and lesions_ten is not None and prl_ten is not None:
-                flair_ten = flair_ten.unsqueeze(0)
-                phase_ten = phase_ten.unsqueeze(0)
 
                 #Normalize the images
-                flair_ten = normalizer(flair_ten)
+                flair_ten = flair_normalizer(flair_ten)
 
                 lesions_ten[lesions_ten > 0] = 1
                 prl_ten[prl_ten > 0] = 1
 
-                lesions_ten, prl_ten = lt.grow_all_regions(lesions_ten.squeeze(0), prl_ten.squeeze(0))
+                lesions_ten = lesions_ten.squeeze(0)
+                prl_ten = prl_ten.squeeze(0)
+
+                lesions_clusters = lt.get_clusters_3d(lesions_ten)
+                prls_clusters = zip(*torch.nonzero(prl_ten, as_tuple=True))
+
+                prls_clusters = lt.get_overlapping_clusters_from_central_lines(lesions_clusters, prls_clusters)
+                prl_ten = torch.zeros_like(lesions_ten)
+                lesions_ten = torch.zeros_like(lesions_ten)
+
+
+                for lesion in lesions_clusters:
+                    for coord in lesion:
+                        lesions_ten[coord] = 1
+                for prl in prls_clusters:
+                    for coord in prl:
+                        prl_ten[coord] = 1
+
+
                 lesions_ten = lesions_ten.unsqueeze(0)
                 prl_ten = prl_ten.unsqueeze(0)
 
@@ -219,38 +385,31 @@ def create_star_dataset_3d(
                 background_ten = torch.ones_like(lesions_ten) - lesions_ten - prl_ten
                 mask_ten = torch.stack([background_ten, lesions_ten, prl_ten], dim=1).squeeze(0)
 
-                # Normalize the phase image between -pi and pi
-                phase_ten = (phase_ten / phase_ten.max()) * math.pi
+                progress.update(task, description="Transforming data..")
 
                 phase_mask = transforms.create_phase_mask(phase_ten, n = 4)
                 star_img = flair_ten * phase_mask
-                star_img = star_img.squeeze(0)
 
-                star_img = crop(star_img)
-                mask_ten = crop(mask_ten)
 
-                assert(len(star_img.shape) == 4)
-                assert(len(mask_ten.shape) == 4)
+                assert(star_img.dim() == 4), f"SWI image has {star_img.dim()} dimensions, expected 4!"
+                assert(mask_ten.dim() == 4), f"Mask image has {mask_ten.dim()} dimensions, expected 4!"
+                assert(phase_ten.dim() == 4), f"Phase image has {phase_ten.dim()} dimensions, expected 4!"
 
-                if i < num_val_samples:
-                    torch.save([star_img, mask_ten], f"{save_val_dir}/{i}.pt")
-                elif i < num_val_samples + num_test_samples:
-                    torch.save([star_img, mask_ten], f"{save_test_dir}/{i}.pt")
-                elif augment:
-                    augmented = augment_image(star_img, mask_ten, prob=1, progress=progress)
-                    for k, (img, mask) in enumerate(augmented):
-                        img = type_conversion.convert_to_tensor(img, track_meta=False)
-                        mask = type_conversion.convert_to_tensor(mask, track_meta=False)
-                        torch.save([img, mask], f"{save_train_dir}/{i}_{k}.pt")
+                #Permute from [C, D, H, W] to [D, C, H, W]
+                star_img = star_img.permute(2, 0, 1, 3)
+                mask_ten = mask_ten.permute(2, 0, 1, 3)
+                phase_ten = phase_ten.permute(2, 0, 1, 3)
+
+
+                if i < num_test_samples:
+                    torch.save([star_img, phase_ten, mask_ten], f"{save_test_dir}/{i}.pt")
                 else:
-                    torch.save([star_img, mask_ten], f"{save_train_dir}/{i}.pt")
+                    torch.save([star_img, phase_ten, mask_ten], f"{save_train_val_dir}/{i}.pt")
+                
+                progress.update(task, advance=1)
+                progress.refresh()
 
-            progress.update(task, advance=1)
-            progress.refresh()
-
-    
-
-
+        progress.update(task, description="Loading data complete!")
 
 
 def augment_prl_images(train_img: Union[torch.Tensor, List[torch.Tensor]], train_label: torch.Tensor, progress: Progress = None) -> Tuple[list, list]:
@@ -268,20 +427,24 @@ def augment_prl_images(train_img: Union[torch.Tensor, List[torch.Tensor]], train
     prl_imgs = [img[prl_slices] for img in train_img]
     prl_labels = train_label[prl_slices]
 
-    rand_angle_rad = np.random.uniform(-math.pi / 8, math.pi / 8)
 
-    rotation = Rotate(angle=rand_angle_rad, keep_size=True)  # Use a single angle for 2D data
-    flip = Flip(spatial_axis=[0,1])
-    gaussion_noise = RandGaussianNoise(prob=1, mean = 0, std=0.1)
-    augmentations = [rotation, flip, gaussion_noise]
 
     augmented_prl_imgs = [[] for _ in range(len(prl_imgs))]
     augmented_prl_labels = []
 
     if progress is not None:
-        task = progress.add_task("Augmenting PRL images...", total=len(prl_imgs[0].shape[0]) * len(augmentations))
+        task = progress.add_task("Augmenting PRL images...", total= prl_imgs[0].shape[0])
 
     for i in range(prl_imgs[0].shape[0]):
+
+        rand_angle_rad = np.random.uniform(-math.pi / 8, math.pi / 8)
+        rand_angle_rad_2 = np.random.uniform(-math.pi / 8, math.pi / 8)
+        rotation = Rotate(angle=rand_angle_rad, keep_size=True)  # Use a single angle for 2D data
+        rotation_2 = Rotate(angle=rand_angle_rad_2, keep_size=True)  # Use a single angle for 2D data
+        flip = Flip(spatial_axis=[0,1])
+        gaussion_noise = RandGaussianNoise(prob=1, mean = 0, std=0.1)
+        augmentations = [rotation, flip, gaussion_noise, rotation_2]
+
         for j in range(len(augmentations)):
             
             for k, prl_img in enumerate(prl_imgs):
@@ -296,12 +459,13 @@ def augment_prl_images(train_img: Union[torch.Tensor, List[torch.Tensor]], train
                 augmented_prl_labels.append(type_conversion.convert_to_tensor(augmentations[j](prl_labels[i]), track_meta=False))
             else:
                 augmented_prl_labels.append(prl_labels[i])
-            if progress is not None:
-                progress.update(task, advance=1)
-                progress.refresh()
+        if progress is not None:
+            progress.update(task, advance=1)
+            progress.refresh()
     
     if progress is not None:
         progress.remove_task(task)
+    
         
     return *augmented_prl_imgs, augmented_prl_labels
 

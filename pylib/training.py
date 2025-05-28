@@ -42,6 +42,7 @@ def train_prl_seg_unet(model,
                 reduce_lr_on_plateau: bool = False,
                 reduce_lr_on_plateau_patience: int = 5,
                 reduce_lr_on_plateau_factor: float = 0.5,
+                validation_interval: int = 1
               ) -> Tuple[list, list]:
 
     model = model.to(device)
@@ -101,58 +102,66 @@ def train_prl_seg_unet(model,
             
             description = f"Epoch {epoch} | Training Loss: {loss_train / len(train_loader)}"
             progress.update(train_task, description=description)
-            model.eval()
 
-            val_task = progress.add_task("Validation...", total = len(val_loader))
+            if val_loader is not None:
 
-            last_epoch_val_mag, last_epoch_val_phase, last_epoch_val_pred, last_epoch_val_label = [], [], [], []
-            
-            with torch.no_grad():
-                for mag, phase, label in val_loader:
-                    mag = mag.to(device)
-                    phase = phase.to(device)
-                    label = label.to(device, dtype=torch.float32)
+                model.eval()
 
-                    with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=True):
-                        val_outputs = model(mag, phase)
-                        val_loss = loss_fn(val_outputs, label)
+                val_task = progress.add_task("Validation...", total = len(val_loader))
 
-                    pred = torch.sigmoid(val_outputs)
-                    pred = pred > 0.5
-
-                    if save_last_epoch_val and epoch == epochs:
-                        last_epoch_val_mag.append(mag.detach().cpu())
-                        last_epoch_val_phase.append(phase.detach().cpu())
-                        last_epoch_val_pred.append(pred.detach().cpu())
-                        last_epoch_val_label.append(label.detach().cpu())
-
-
-                    dice_metric_total(pred, label)
-                    dice_metric_lesions(pred[:, 1], label[:, 1])
-                    dice_metric_prls(pred[:, 2], label[:, 2])
-
-                    loss_val += val_loss.item()
-
-                    progress.update(val_task, advance=1)
-                    progress.refresh()
+                last_epoch_val_mag, last_epoch_val_phase, last_epoch_val_pred, last_epoch_val_label = [], [], [], []
                 
-                dice_metric_total_result = dice_metric_total.aggregate().item()
-                dice_metric_lesions_result = dice_metric_lesions.aggregate().item()
-                dice_metric_prls_result = dice_metric_prls.aggregate().item()
-                
-                    
-            description = f"Epoch {epoch} | Validation loss: {loss_val / len(val_loader)} \n  - DiceMetric {dice_metric_total_result:.5f} \n  - DiceMetric Lesions: {dice_metric_lesions_result:.5f} \n  - DiceMetric PRLs: {dice_metric_prls_result:.5f}"
-            progress.update(val_task, description=description)
+                with torch.no_grad():
+                    for mag, phase, label in val_loader:
+                        mag = mag.to(device)
+                        phase = phase.to(device)
+                        label = label.to(device, dtype=torch.float32)
 
-            dice_metric_total.reset()
-            dice_metric_lesions.reset()
-            dice_metric_prls.reset()
+                        with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=True):
+                            val_outputs = model(mag, phase)
+                            val_loss = loss_fn(val_outputs, label)
+
+                        pred = torch.sigmoid(val_outputs)
+                        pred = pred > 0.5
+
+                        if save_last_epoch_val and epoch == epochs:
+                            last_epoch_val_mag.append(mag.detach().cpu())
+                            last_epoch_val_phase.append(phase.detach().cpu())
+                            last_epoch_val_pred.append(pred.detach().cpu())
+                            last_epoch_val_label.append(label.detach().cpu())
+
+                        if epoch % validation_interval == 0 or epoch == epochs: 
+                            dice_metric_total(pred, label)
+                            dice_metric_lesions(pred[:, 1], label[:, 1])
+                            dice_metric_prls(pred[:, 2], label[:, 2])
+
+                        loss_val += val_loss.item()
+
+                        progress.update(val_task, advance=1)
+                        progress.refresh()
+
+                    if epoch % validation_interval == 0 or epoch == epochs: 
+                        dice_metric_total_result = dice_metric_total.aggregate().item()
+                        dice_metric_lesions_result = dice_metric_lesions.aggregate().item()
+                        dice_metric_prls_result = dice_metric_prls.aggregate().item()
+                
+  
+                description = f"Epoch {epoch} | Validation loss: {loss_val / len(val_loader)} \n"
+                if epoch % validation_interval == 0 or epoch == epochs:      
+                    description += f"- DiceMetric {dice_metric_total_result:.5f} \n  - DiceMetric Lesions: {dice_metric_lesions_result:.5f} \n  - DiceMetric PRLs: {dice_metric_prls_result:.5f}"
+                    dice_metric_total.reset()
+                    dice_metric_lesions.reset()
+                    dice_metric_prls.reset()
+
+                progress.update(val_task, description=description)
+
+
+                loss_val = loss_val / len(val_loader)
+                losses_val.append(loss_val)
 
             loss_train = loss_train / len(train_loader)
-            loss_val = loss_val / len(val_loader)
-
             losses_train.append(loss_train)
-            losses_val.append(loss_val)
+
             
             progress.update(epoch_task, advance=1, description=f"Epoch: {epoch} / {epochs}")
             progress.refresh()

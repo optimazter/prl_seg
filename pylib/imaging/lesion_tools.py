@@ -77,31 +77,81 @@ def expand_lesion_border(mask: torch.Tensor, expand: int):
 
 
 def get_clusters(tensor: torch.Tensor):
-    non_zero = tensor.nonzero().tolist()
+    non_zero = set(map(tuple, tensor.nonzero().tolist()))
     H, W = tensor.shape
     neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]
 
     clusters = []
 
-    while len(non_zero) > 0:
+    while non_zero:
         queue = deque()
-        queue.append(non_zero.pop(0))
+        queue.append(non_zero.pop())
         cluster = []
         while queue:
             x, y = queue.popleft()
-            if [x, y] not in cluster:
-                cluster.append([x, y])
+            if (x, y) not in cluster:
+                cluster.append((x, y))
             for dx, dy in neighbors:
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < H and 0 <= ny < W:
-                    if [nx, ny] in non_zero and [nx, ny] not in cluster:
-                        non_zero.remove([nx, ny])
-                        cluster.append([nx, ny])
-                        queue.append([nx, ny])
+                    if (nx, ny) in non_zero:
+                        non_zero.remove((nx, ny))
+                        queue.append((nx, ny))
 
         clusters.append(cluster)
 
     return clusters
+
+
+def get_clusters_3d(tensor: torch.Tensor):
+    assert(len(tensor.shape) == 3)
+
+    D, H, W = tensor.shape
+    non_zero = set(map(tuple, tensor.nonzero().tolist()))
+    neighbors = [[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1], 
+                 [-1, -1, 0], [-1, 1, 0], [1, -1, 0], [1, 1, 0],
+                 [-1, 0, -1], [-1, 0, 1], [1, 0, -1], [1, 0, 1],
+                 [0, -1, -1], [0, -1, 1], [0, 1, -1], [0, 1, 1],
+                 [-1, -1, -1], [-1, -1, 1], [-1, 1, -1], [-1, 1, 1],
+                 [1, -1, -1], [1, -1, 1], [1, 1, -1], [1, 1, 1]]
+
+    clusters = []
+    while non_zero:
+        queue = deque()
+        queue.append(non_zero.pop())
+        cluster = []
+        while queue:
+            x, y, z = queue.popleft()
+            if (x, y, z) not in cluster:
+                cluster.append((x, y, z))
+            for dx, dy, dz in neighbors:
+                nx, ny, nz = x + dx, y + dy, z + dz
+                if 0 <= nx < D and 0 <= ny < H and 0 <= nz < W:
+                    if (nx, ny, nz) in non_zero:
+                        non_zero.remove((nx, ny, nz))
+                        queue.append((nx, ny, nz))
+
+        clusters.append(cluster)
+    
+    return clusters
+
+
+def get_overlapping_clusters_from_central_lines(clusters, central_lines):
+    overlapping_clusters = []
+    for line in central_lines:
+        for cluster in clusters:
+            if line in cluster:
+                overlapping_clusters.append(cluster)
+
+    return overlapping_clusters
+
+
+def get_mask_from_clusters(clusters, shape):
+    mask = torch.zeros(shape, dtype=torch.uint8)
+    for cluster in clusters:
+        for coord in cluster:
+            mask[coord] = 1
+    return mask
 
 
 def combine_clusters_by_distance(clusters, min_euclidean_distance):
@@ -304,3 +354,25 @@ def combine_clusters_by_overlap(clusters_4d):
                 merged_3d_clusters.append(merged_coords)
 
     return merged_3d_clusters
+
+
+
+def get_max_diameter_of_cluster(cluster: list):
+    """
+    Calculate the maximum diameter of a cluster of points.
+
+    Args:
+        cluster (list): A list of tuples representing the coordinates of the points in the cluster.
+
+    Returns:
+        float: The maximum diameter of the cluster.
+    """
+    max_distance = 0
+    for i in range(len(cluster)):
+        for j in range(i + 1, len(cluster)):
+            distance = np.sqrt((cluster[i][0] - cluster[j][0]) ** 2 + (cluster[i][1] - cluster[j][1]) ** 2)
+            if distance > max_distance:
+                max_distance = distance
+    return max_distance
+
+    

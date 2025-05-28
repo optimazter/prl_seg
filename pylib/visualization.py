@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.animation import FuncAnimation
 from matplotlib import patches
+from pylib.imaging import lesion_tools as lt
 
 import SimpleITK as sitk
 import numpy as np
@@ -10,11 +11,154 @@ from torchvision.transforms import functional as F
 import pylib.nifti as nii
 import numpy as np
 import os
-import torchviz  as vz
 import types
 import tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from typing import Iterable, List, Tuple, Union
+from typing import Iterable, List, Tuple, Union, Dict
+from enum import Enum
+from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
+from threading import Timer
+
+
+class ImageConfig3D(Enum):
+    CHWD = 0
+    CWHD = 1
+    DCWH = 2
+    DCHW = 3
+    CDHW = 4
+    CDWH = 5
+
+
+
+class Image3D:
+
+    def __init__(self, 
+                 data: torch.Tensor, 
+                 title: str = None, 
+                 image_config: ImageConfig3D = ImageConfig3D.CHWD,
+                 mask: torch.Tensor = None
+            ):
+        assert(isinstance(data, torch.Tensor), "data must be a torch.Tensor")
+        assert(len(data.shape) == 3, "data must be a 3D tensor of shape ImageConfig")
+        if mask is not None:
+            assert(isinstance(mask, torch.Tensor), "mask must be a torch.Tensor")
+            assert(len(mask.shape) == 3, "mask must be a 4D tensor of shape [D, C, H, W] or [C, H, W, D]")
+            assert(data.shape == mask.shape, "data and mask must have the same shape")
+
+        self.data = data
+        self.title = title
+        self.image_config = image_config
+        self.mask = mask
+        if title is None:
+            if mask is not None:
+                self.title = "Image and Mask"
+            else:
+                self.title = "Image"
+        self.W = self._get_width()
+        self.H = self._get_height()
+        self.D = self._get_depth()
+    
+    def _get_width(self):
+        match self.image_config:
+            case ImageConfig3D.CHWD:
+                return self.data.shape[2]
+            case ImageConfig3D.CWHD:
+                return self.data.shape[1]
+            case ImageConfig3D.DCHW:
+                return self.data.shape[3]
+            case ImageConfig3D.DCWH:
+                return self.data.shape[2]
+            case ImageConfig3D.CDHW:
+                return self.data.shape[3]
+            case ImageConfig3D.CDWH:
+                return self.data.shape[2]
+            case _:
+                raise ValueError("Invalid image configuration")
+    
+    def _get_height(self):
+        match self.image_config:
+            case ImageConfig3D.CHWD:
+                return self.data.shape[1]
+            case ImageConfig3D.CWHD:
+                return self.data.shape[2]
+            case ImageConfig3D.DCHW:
+                return self.data.shape[2]
+            case ImageConfig3D.DCWH:
+                return self.data.shape[3]
+            case ImageConfig3D.CDHW:
+                return self.data.shape[2]
+            case ImageConfig3D.CDWH:
+                return self.data.shape[3]
+            case _:
+                raise ValueError("Invalid image configuration")
+    
+    def _get_depth(self):
+        match self.image_config:
+            case ImageConfig3D.CHWD:
+                return self.data.shape[3]
+            case ImageConfig3D.CWHD:
+                return self.data.shape[3]
+            case ImageConfig3D.DCHW:
+                return self.data.shape[0]
+            case ImageConfig3D.DCWH:
+                return self.data.shape[0]
+            case ImageConfig3D.CDHW:
+                return self.data.shape[1]
+            case ImageConfig3D.CDWH:
+                return self.data.shape[1]
+            case _:
+                raise ValueError("Invalid image configuration")
+    
+    def get_slice(self, idx: int, return_mask: bool = False) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Get the slice of the image at the given index.
+
+        Parameters:
+            idx (int): The index of the slice to get.
+            return_mask (bool): Whether to return the mask as well. Default is False.
+        """
+        match self.image_config:
+            case ImageConfig3D.CHWD:
+                if return_mask and self.mask is not None:
+                    return self.data[..., idx], self.mask[..., idx]
+                elif return_mask and self.mask is None:
+                    return self.data[..., idx], None
+                return self.data[..., idx]
+            case ImageConfig3D.CWHD:
+                if return_mask and self.mask is not None:
+                    return self.data[..., idx], self.mask[..., idx]
+                elif return_mask and self.mask is None:
+                    return self.data[..., idx], None
+                return self.data[..., idx]
+            case ImageConfig3D.DCHW:
+                if return_mask and self.mask is not None:
+                    return self.data[idx], self.mask[idx]
+                elif return_mask and self.mask is None:
+                    return self.data[idx], None
+                return self.data[idx]
+            case ImageConfig3D.DCWH:
+                if return_mask and self.mask is not None:
+                    return self.data[idx], self.mask[idx]
+                elif return_mask and self.mask is None:
+                    return self.data[idx], None
+                return self.data[idx]
+            case ImageConfig3D.CDHW:
+                if return_mask and self.mask is not None:
+                    return self.data[:, idx], self.mask[:, idx]
+                elif return_mask and self.mask is None:
+                    return self.data[:, idx], None
+                return self.data[:, idx]
+            case ImageConfig3D.CDWH:
+                if return_mask and self.mask is not None:
+                    return self.data[:, idx], self.mask[:, idx]
+                elif return_mask and self.mask is None:
+                    return self.data[:, idx], None
+                return self.data[:, idx]
+            case _:
+                raise ValueError("Invalid image configuration")
+    
+
+
 
 
 
@@ -215,48 +359,148 @@ def plot_loss(f):
 
 
 
-def run_prediction_app(pred_data: Iterable[torch.Tensor], canvas_size: tuple = (800, 600), ):
 
-    assert(isinstance(pred_data, Iterable), "pred_data must be an iterable of tuples (mag, phase, pred, label)")
-    assert(all(isinstance(x, torch.Tensor) and len(x.shape) == 4 for x in pred_data), "pred_data must be an iterable of tuples (mag, phase, pred, label) where each element is a 4D tensor")
+def run_app(
+    image_3d: Union[Image3D, List[Image3D]],
+    canvas_size: tuple = (800, 600),
+    refresh_rate_ms: int = 100,
+    **kwargs
+    ):
+    """
+    Run a Tkinter app to visualize the data.
+
+    Parameters:
+    image_3d (Image3D): The 3D image to visualize or a list of 3D images.
+    canvas_size (tuple): The size of the canvas in pixels. Default is (800, 600).
+    **kwargs: Additional arguments to pass to the plot_nifti_on_ax function. Read the docstring of that function for more details.
+    """
+
+    global idx
     idx = 0
 
+    global debounce_timer
+    debounce_timer = None
+
+
+    if isinstance(image_3d, Image3D):
+        image_3d = [image_3d]
+
+    
+
+    assert(isinstance(image_3d, list) and all(isinstance(x, Image3D) for x in image_3d), "image_3d must be a list of Image3D objects")
+
+    assert(all(image.W == image_3d[0].W for image in image_3d), "All images must have the same width")
+    assert(all(image.H == image_3d[0].H for image in image_3d), "All images must have the same height")
+    assert(all(image.D == image_3d[0].D for image in image_3d), "All images must have the same depth")
+
+    W, H, D = image_3d[0].W, image_3d[0].H, image_3d[0].D
+
+    global fig
+    fig, axs = plt.subplots(ncols=len(image_3d), nrows=1, figsize=(canvas_size[0] / 100, canvas_size[1] / 100), dpi=100)
+    if not isinstance(axs, np.ndarray):
+        axs = [axs]
+    
+
+
+
+    def debounce_update_plot():
+        global debounce_timer
+        if debounce_timer is not None:
+            if debounce_timer.is_alive():
+                debounce_timer.cancel()
+        debounce_timer = Timer(refresh_rate_ms / 1000, update_plot)
+        debounce_timer.start()
+
+    def update_slice_label():
+        txt = f"Slice: {idx + 1}/{D}"
+        slice_label.config(text=txt)
+
+
+
+
     def update_plot():
-        axs[0].clear()
-        axs[1].clear()
-        axs[2].clear()
-        mag, phase, pred, label = pred_data[idx]
-        mag = mag.squeeze(0)
-        phase = phase.squeeze(0)
-        plot_nifti_on_ax(axs[0], img=mag, title="SWI image")
-        plot_nifti_on_ax(axs[1], img=mag, mask=label, title="Target Lesions on SWI", mask_legend=["Lesion", "PRL"], drop_first_label_channel=True)
-        plot_nifti_on_ax(axs[2], img=mag, mask=pred, title="Predicted Lesions on SWI", mask_legend=["Lesion", "PRL"], drop_first_label_channel=True)
+        global idx
+        for ax in axs:
+            ax.clear()
+        
+        for i, image in enumerate(image_3d):
+            img_2d, mask_2d = image.get_slice(idx, return_mask=True)
+            plot_nifti_on_ax(axs[i], img=img_2d.squeeze(0), mask=mask_2d, title=image.title, **kwargs)
+        
+
         canvas.draw()
+        update_slice_label()
 
     def on_key(event):
+        global idx
         if event.keysym == "Right":
-            idx = min(idx + 1, len(pred_data) - 1)
+            idx = min(idx + 1, D - 1)
         elif event.keysym == "Left":
             idx = max(idx - 1, 0)
+        debounce_update_plot()
+
+    def on_mouse_scroll(event):
+        global idx
+        if event.delta > 0:  # Scroll up
+            idx = max(idx - 1, 0)
+        elif event.delta < 0:  # Scroll down
+            idx = min(idx + 1, D - 1)
+        debounce_update_plot()
+
+    def on_input_change(*args):
+        global idx
+        try:
+            new_idx = int(slice_input_var.get()) - 1
+            if 0 <= new_idx < D:
+                idx = new_idx
+                update_plot()
+            else:
+                slice_input_var.set(str(idx + 1))  # Reset to current valid slice
+        except ValueError:
+            slice_input_var.set(str(idx + 1))  # Reset to current valid slice
+
+
+    try:
+        # Create the Tkinter window
+        root = tk.Tk()
+        root.title("Predictions Visualization")
+
+        canvas = FigureCanvasTkAgg(fig, master=root)
+        canvas_widget = canvas.get_tk_widget()
+        canvas_widget.pack(fill=tk.BOTH, expand=True)
+        toolbar_frame = tk.Frame(root)
+        toolbar_frame.pack(side=tk.TOP, fill=tk.X)
+
+        toolbar = NavigationToolbar2Tk(canvas, toolbar_frame)
+        toolbar.update()
+
+        # Add a label to display the current slice
+        slice_label = tk.Label(root, text="", font=("Arial", 12))
+        slice_label.pack()
+
+        # Add an input box for slice selection
+        slice_input_var = tk.StringVar(value=str(idx + 1))
+        slice_input_var.trace_add("write", on_input_change)
+        slice_input = tk.Entry(root, textvariable=slice_input_var, font=("Arial", 12), width=5, justify="center")
+        slice_input.pack()
+
+        # Bind the arrow keys to the window
+        root.bind("<Left>", on_key)
+        root.bind("<Right>", on_key)
+
+        # Bind the mouse scroll event to the window
+        root.bind("<MouseWheel>", on_mouse_scroll)
+
+        # Initialize the plot
         update_plot()
 
+        # Start the Tkinter main loop
+        root.mainloop()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        if 'root' in locals() and root.winfo_exists():
+            root.destroy()
 
-    # Create the Tkinter window
-    root = tk.Tk()
-    root.title("Predictions Visualization")
 
-    # Create the matplotlib figure and axes
-    fig, axs = plt.subplots(ncols=3, nrows=1, figsize=(canvas_size[0] / 100, canvas_size[1] / 100), dpi=100)
-    canvas = FigureCanvasTkAgg(fig, master=root)
-    canvas_widget = canvas.get_tk_widget()
-    canvas_widget.pack(fill=tk.BOTH, expand=True)
 
-    # Bind the arrow keys to the window
-    root.bind("<Left>", on_key)
-    root.bind("<Right>", on_key)
 
-    # Initialize the plot
-    update_plot()
-
-    # Start the Tkinter main loop
-    root.mainloop()

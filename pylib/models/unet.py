@@ -35,23 +35,15 @@ class PRLUNet(nn.Module):
 
         self.fuse = nn.Conv2d(1024 * 2, 1024, kernel_size=1)
 
-        self.up11 = nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2) 
-        self.conv11 = self.build_double_conv(1024, 512)
-        self.up12 =nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-        self.conv12 = self.build_double_conv(512, 256)
-        self.up13 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
-        self.conv13 = self.build_double_conv(256, 128)
-        self.up14 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        self.conv14 = self.build_double_conv(128, 64)
 
         self.up21 = nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2)
-        self.conv21 = self.build_double_conv(1024, 512)
+        self.conv21 = self.build_double_conv(1024 + 512, 512)
         self.up22 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-        self.conv22 = self.build_double_conv(512, 256)
-        self.up23 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
-        self.conv23 = self.build_double_conv(256, 128)
+        self.conv22 = self.build_double_conv(512 + 256, 256)
+        self.up23 = nn.ConvTranspose2d(256 , 128, kernel_size=2, stride=2)
+        self.conv23 = self.build_double_conv(256 + 128, 128)
         self.up24 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        self.conv24 = self.build_double_conv(128, 64)
+        self.conv24 = self.build_double_conv(128 + 64, 64)
 
 
         self.head = nn.Conv2d(64, n_classes, kernel_size=1)
@@ -95,7 +87,6 @@ class PRLUNet(nn.Module):
         d24 = self.down23(d23)
         d25 = self.down24(d24)
 
-        print(d25.shape, d15.shape)
 
         #Adding spatial connection between the two branches
         fuse = torch.cat([d25, d15], dim=1)
@@ -103,22 +94,22 @@ class PRLUNet(nn.Module):
 
         u21 = self.up21(fuse)
         u21 = self.pad(u21, d24)    
-        x2 = torch.cat([d24, u21], dim=1)
+        x2 = torch.cat([d24, d14, u21], dim=1)
         x2 = self.conv21(x2)
 
         u22 = self.up22(x2)
         u22 = self.pad(u22, d23)
-        x2 = torch.cat([d23, u22], dim=1)
+        x2 = torch.cat([d23, d13, u22], dim=1)
         x2 = self.conv22(x2)
 
         u23 = self.up23(x2)
         u23 = self.pad(u23, d22)
-        x2 = torch.cat([d22, u23], dim=1)
+        x2 = torch.cat([d22, d12, u23], dim=1)
         x2 = self.conv23(x2)
 
         u24 = self.up24(x2)
         u24 = self.pad(u24, d21)
-        x2 = torch.cat([d21, u24], dim=1)
+        x2 = torch.cat([d21, d11, u24], dim=1)
         x2 = self.conv24(x2)
 
         out2 = self.head(x2)
