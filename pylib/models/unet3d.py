@@ -1,9 +1,6 @@
 import torch
 from torch import nn
 
-#https://debuggercafe.com/unet-from-scratch-using-pytorch/
-#https://github.com/milesial/Pytorch-UNet/blob/master/unet/unet_model.py
-
 
 import torch
 import torch.nn as nn
@@ -13,6 +10,20 @@ import torch.nn.functional as F
 
 
 class PRLUNet3D(nn.Module):
+
+    """
+    A PyTorch implementation of a 3D version of the PRLU-Net by Adrian Hjertholm Voldeth (2025). 
+    Based on the original U-Net architecture by Ronneberger et al. (2015).
+    The code is also inspired by the implementation from Sovit Ranjan RathSovit Ranjan Rath (2023) available at: http://debuggercafe.com/unet-from-scratch-using-pytorch/, and 
+    the code by milesal: https://github.com/milesial/Pytorch-UNet/tree/master?tab=readme-ov-file.
+
+    Reference:
+        Voldeth, A. H. (2025). AI Driven Paramagnetic Rim Lesion Differentiation in Multiple Sclerosis
+
+        U-Net: Convolutional Networks for Biomedical Image Segmentation.
+        Ronneberger, O., Fischer, P., & Brox, T. (2015). arXiv preprint arXiv:1505.04597.
+
+    """
 
     def __init__(self, n_channels, n_classes):
         super().__init__()

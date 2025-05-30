@@ -1,10 +1,5 @@
 import torch
 from torch import nn
-
-#https://debuggercafe.com/unet-from-scratch-using-pytorch/
-#https://github.com/milesial/Pytorch-UNet/blob/master/unet/unet_model.py
-
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,7 +9,27 @@ import torch.nn.functional as F
 
 class PRLUNet(nn.Module):
 
+    """
+    A PyTorch implementation of the dual encoder U-Net, PRLU-Net by Adrian Hjertholm Voldeth (2025). 
+    Based on the original U-Net architecture by Ronneberger et al. (2015).
+    The code is also inspired by the implementation from Sovit Ranjan RathSovit Ranjan Rath (2023) available at: http://debuggercafe.com/unet-from-scratch-using-pytorch/, and 
+    the code by milesal: https://github.com/milesial/Pytorch-UNet/tree/master?tab=readme-ov-file.
+
+    Reference:
+        Voldeth, A. H. (2025). AI Driven Paramagnetic Rim Lesion Differentiation in Multiple Sclerosis
+
+        U-Net: Convolutional Networks for Biomedical Image Segmentation.
+        Ronneberger, O., Fischer, P., & Brox, T. (2015). arXiv preprint arXiv:1505.04597.
+
+    """
+
     def __init__(self, n_channels, n_classes):
+        """
+        Initializes the PRLU-Net model.
+        Args:
+            n_channels (int): Number of input channels (e.g., 1 for grayscale images).
+            n_classes (int): Number of output classes for segmentation.
+        """
         super().__init__()
 
         self.n_channels = n_channels
@@ -50,18 +65,38 @@ class PRLUNet(nn.Module):
 
 
     def pad(self, x1, x2):
+        """
+        Pads the input tensor x1 to match the spatial dimensions of x2.
+        Args:
+            x1 (torch.Tensor): The input tensor to be padded.
+            x2 (torch.Tensor): The tensor whose dimensions x1 should match.
+        Returns:
+            torch.Tensor: The padded tensor.
+        """
         diffY = x2.size()[2] - x1.size()[2]
         diffX = x2.size()[3] - x1.size()[3]
         return F.pad(x1, [diffX // 2, diffX - diffX // 2,
                         diffY // 2, diffY - diffY // 2])
 
     def build_down_conv(self, in_channels, out_channels):
+        """
+        Builds a downsampling convolutional block with max pooling and double convolution.
+        Args:
+            in_channels (int): Number of input channels.
+            out_channels (int): Number of output channels.
+        """
         return nn.Sequential(
             nn.MaxPool2d(2),
             self.build_double_conv(in_channels, out_channels)
         )
 
     def build_double_conv(self, in_channels, out_channels):
+        """
+        Builds a double convolutional block with two convolutional layers, batch normalization, and ReLU activation.
+        Args:
+            in_channels (int): Number of input channels.
+            out_channels (int): Number of output channels.
+        """
         return nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_channels),
@@ -74,6 +109,15 @@ class PRLUNet(nn.Module):
 
 
     def forward(self, mag, phase):
+
+        """
+        Forward pass of the PRLU-Net model.
+        Args:
+            mag (torch.Tensor): The SWI magnitude input tensor.
+            phase (torch.Tensor): The T2* phase input tensor.
+        Returns:
+            torch.Tensor: The output tensor after passing through the network.
+        """
 
         d11 = self.in_conv1(mag)
         d12 = self.down11(d11)

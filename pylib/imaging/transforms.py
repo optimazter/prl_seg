@@ -5,6 +5,13 @@ import numpy as np
 import math
 
 def load_nifti_to_tensors(nifti_path: str):
+    """
+    Load a NIfTI file and convert it to a PyTorch tensor.
+    Args:
+        nifti_path (str): Path to the NIfTI file.
+    Returns:
+        torch.Tensor: The image data as a PyTorch tensor with shape (D, H, W).
+    """
     img = sitk.ReadImage(nifti_path)
     ten = torch.tensor(sitk.GetArrayFromImage(img)).permute(2, 1, 0)
     return ten
@@ -12,6 +19,13 @@ def load_nifti_to_tensors(nifti_path: str):
 
 
 def crop_tensor(tensor: torch.Tensor):
+    """
+    Crop a 3D tensor to a square shape by removing the extra rows or columns.
+    Args:
+        tensor: A 3D torch.Tensor of shape (N, W, H) where N is the number of channels.
+    Returns:
+        A cropped tensor of shape (N, W, W) where W is the smaller dimension of the original tensor.
+    """
     n, w, h = tensor.shape
     tensor = tensor[:, :, h - w : h]
     return tensor
@@ -106,6 +120,14 @@ def create_phase_mask(phase, n = 4) -> torch.Tensor:
 
 
 def high_pass_filter(image: torch.Tensor, cutoff: float = 0.1) -> torch.Tensor:
+    """
+    Apply a high-pass filter to a 2D image using Fourier Transform.
+    Args:
+        image (torch.Tensor): Input image tensor of shape (H, W).
+        cutoff (float): Cutoff frequency for the high-pass filter, typically between 0 and 1.
+    Returns:
+        torch.Tensor: The filtered image tensor of the same shape as the input.
+    """
     assert image.dim() == 2, "Image must be 2D of shape (H, W)"
     fft_img = torch.fft.fft2(image)
     fft_shift_img = torch.fft.fftshift(fft_img)
@@ -125,6 +147,14 @@ def high_pass_filter(image: torch.Tensor, cutoff: float = 0.1) -> torch.Tensor:
 
 
 def low_pass_filter(image: torch.Tensor, kernel_size = 15) -> torch.Tensor:
+    """
+    Apply a low-pass filter to a 2D image using a mean filter.
+    Args:
+        image (torch.Tensor): Input image tensor of shape (H, W).
+        kernel_size (int): Size of the kernel for the mean filter.
+    Returns:
+        torch.Tensor: The filtered image tensor of the same shape as the input.
+    """
     assert image.dim() == 2, "Image must be 2D of shape (H, W)"
     kernel = torch.ones((kernel_size, kernel_size), dtype=image.dtype, device=image.device) / (kernel_size * kernel_size)
     return torch.nn.functional.conv2d(image.unsqueeze(0).unsqueeze(0), kernel.unsqueeze(0).unsqueeze(0), padding=kernel_size//2).squeeze(0).squeeze(0)

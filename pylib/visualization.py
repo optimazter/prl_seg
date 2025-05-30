@@ -32,6 +32,18 @@ class ImageConfig3D(Enum):
 
 class Image3D:
 
+    """
+    A class to represent a 3D image with optional mask.
+    The image can be in different configurations, specified by the `image_config` parameter.
+    The configurations are:
+    - CHWD: Channels, Height, Width, Depth
+    - CWHD: Channels, Width, Height, Depth
+    - DCHW: Depth, Channels, Height, Width
+    - DCWH: Depth, Channels, Width, Height
+    - CDHW: Channels, Depth, Height, Width
+    - CDWH: Channels, Depth, Width, Height
+    """
+
     def __init__(self, 
                  data: torch.Tensor, 
                  title: str = None, 
@@ -172,6 +184,17 @@ def plot_color_description_box_on_ax(
     descriptions=[],
     fontsize=10,  # Font size for the description text
 ):
+    """
+    Plots a color description box on the given axis.
+    Parameters:
+        axis (plt.axes): The axis on which to plot the color description box.
+        box_width (float): The width of the box in relative coordinates (0 to 1).
+        box_height (float): The height of the box in relative coordinates (0 to 1).
+        padding (float): The padding around the box in relative coordinates (0 to 1).
+        colors (list): A list of colors for the boxes.
+        descriptions (list): A list of descriptions corresponding to each color.
+        fontsize (int): Font size for the description text.
+    """
     # Calculate the position for the bottom right corner in axis coordinates
     x = 1 - box_width - padding
     y = padding
@@ -214,6 +237,21 @@ def plot_nifti_on_ax(
     fontsize = 10,
     drop_first_label_channel = True #We assume that the first channel is the background mask
 ):
+    """
+    Plots a 2D or 3D NiFTI image and its mask on the given axis.
+    Parameters:
+        axis (plt.axes): The axis on which to plot the image and mask.
+        img (torch.Tensor or str): The image to plot. Can be a 2D or 3D tensor or a path to a NiFTI file.
+        mask (torch.Tensor or str): The mask to plot. Can be a 2D, 3D or 4D tensor or a path to a NiFTI file.
+        title (str): The title of the plot.
+        cmap (str): The colormap to use for the image.
+        idx (int): The index of the slice to plot in case of 3D images. If None, the middle slice is used.
+        mask_legend (list): A list of descriptions for each mask color.
+        k_rot90 (int): Number of times to rotate the image by 90 degrees counter-clockwise.
+        alpha_mask (float): Alpha value for the mask overlay.
+        fontsize (int): Font size for the mask legend descriptions.
+        drop_first_label_channel (bool): Whether to drop the first channel of the mask, assuming it is the background.
+    """
     mask_colors = [mcolors.to_rgba(c, alpha=alpha_mask) for c, _ in mcolors.BASE_COLORS.items()]
     ax = axis
     C, N, W, H = 0,0,0,0

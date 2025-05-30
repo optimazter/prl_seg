@@ -30,6 +30,21 @@ def create_lesion_seg_dataset(
         num_test_samples: int = 1
     ):
 
+    """
+    Create a dataset for lesion segmentation from T2 FLAIR and lesion masks.
+    Args:
+        patient_dirs (List[str]): List of directories containing patient data.
+        flair_fname (str): Filename of the FLAIR image.
+        lesion_fname (str): Filename of the lesion mask.
+        save_seg_train_path (str): Path to save the training dataset.
+        save_seg_val_path (str): Path to save the validation dataset.
+        save_seg_test_path (str): Path to save the test dataset.
+        num_val_samples (int): Number of samples for validation.
+        num_test_samples (int): Number of samples for testing.
+    Returns:
+        None
+    """
+
     
     flair_imgs = []
     lesion_imgs = []
@@ -80,6 +95,25 @@ def create_prl_class_dataset_2d(
         min_inter_lesion_distance: int,
         mask: bool
     ):
+
+    """
+    Create a dataset for PRL classification from T2* phase images, lesion masks, and PRL masks.
+    Args:
+        patient_dirs (List[str]): List of directories containing patient data.
+        phase_fname (str): Filename of the T2* phase image.
+        lesion_fname (str): Filename of the lesion mask.
+        prl_fname (str): Filename of the PRL mask.
+        save_class_train_path (str): Path to save the training dataset.
+        save_class_val_path (str): Path to save the validation dataset.
+        save_class_test_path (str): Path to save the test dataset.
+        train_val_test_split (list): List containing the proportions for train, validation, and test datasets.
+        img_size (int): Size of the sub-images to be extracted.
+        lesion_expansion (int): Expansion factor for the lesions.
+        min_inter_lesion_distance (int): Minimum distance between lesions.
+        mask (bool): Whether to apply a mask to the images.
+    Returns:
+        None
+    """
 
 
     phase_imgs = []
@@ -141,6 +175,10 @@ def create_prl_class_dataset_3d(
         num_test_samples: int = 1,
     ):    
 
+    """
+    3D version of create_prl_class_dataset_2d.
+    """
+
     imgs_3d = []
     labels_3d = []
 
@@ -197,8 +235,20 @@ def create_prl_class_dataset_3d(
 
 
 def process_prl_tensors_to_sub_images_2d(img_ten: torch.Tensor, lesions_ten: torch.Tensor, prl_ten: torch.Tensor, img_size: int, lesion_expansion: int, min_inter_lesion_distance: int, mask: bool = True, progress: Progress = None):
-    
-    
+    """
+    Process tensors to extract sub-images for PRL classification.
+    Args:
+        img_ten (torch.Tensor): Tensor containing the T2* phase images.
+        lesions_ten (torch.Tensor): Tensor containing the lesion masks.
+        prl_ten (torch.Tensor): Tensor containing the PRL masks.
+        img_size (int): Size of the sub-images to be extracted.
+        lesion_expansion (int): Expansion factor for the lesions.
+        min_inter_lesion_distance (int): Minimum distance between lesions.
+        mask (bool): Whether to apply a mask to the images.
+    Returns:
+        Tuple[list, list]: A tuple containing the processed images and labels.
+    """
+
     #Grow PRLs to fit to the expanded lesions
     if progress is not None:
         task = progress.add_task("Growing PRLs", total=1)
@@ -245,6 +295,17 @@ def process_prl_tensors_to_sub_images_2d(img_ten: torch.Tensor, lesions_ten: tor
 
 
 def manual_train_val_test_split(imgs: list, labels: list, num_val_samples: int, num_test_samples: int, cat: bool = True):
+    """
+    Manually split the dataset into training, validation, and test sets.
+    Args:
+        imgs (list): List of image tensors.
+        labels (list): List of label tensors.
+        num_val_samples (int): Number of validation samples.
+        num_test_samples (int): Number of test samples.
+        cat (bool): Whether to concatenate the images and labels.
+    Returns:
+        Tuple: A tuple containing the training, validation, and test sets.
+    """
     train_imgs = imgs[:-num_val_samples - num_test_samples]
     val_imgs = imgs[-num_val_samples - num_test_samples: -num_test_samples]
     test_imgs = imgs[-num_test_samples:]
@@ -267,6 +328,15 @@ def manual_train_val_test_split(imgs: list, labels: list, num_val_samples: int, 
 
 
 def normalize_imgs(train_imgs: torch.Tensor, val_imgs: torch.Tensor, test_imgs: torch.Tensor):
+    """
+    Normalize the images using the mean and standard deviation of the training set.
+    Args:
+        train_imgs (torch.Tensor): Training images tensor.
+        val_imgs (torch.Tensor): Validation images tensor.
+        test_imgs (torch.Tensor): Test images tensor.
+    Returns:
+        Tuple: A tuple containing the normalized training, validation, and test images. 
+    """
     normalizer = Normalize(torch.mean(train_imgs), torch.std(train_imgs))
     train_imgs = normalizer(train_imgs)
     val_imgs = normalizer(val_imgs)
@@ -274,6 +344,15 @@ def normalize_imgs(train_imgs: torch.Tensor, val_imgs: torch.Tensor, test_imgs: 
     return train_imgs, val_imgs, test_imgs
 
 def normalize_imgs_3d(train_imgs: list, val_imgs: list, test_imgs: list):
+    """
+    Normalize the 3D images using the mean and standard deviation of the training set.
+    Args:
+        train_imgs (list): List of training images tensors.
+        val_imgs (list): List of validation images tensors.
+        test_imgs (list): List of test images tensors.
+    Returns:
+        Tuple: A tuple containing the normalized training, validation, and test images.
+    """
     mean = 0
     std = 0
     for img in train_imgs:
@@ -288,6 +367,18 @@ def normalize_imgs_3d(train_imgs: list, val_imgs: list, test_imgs: list):
     return train_imgs, val_imgs, test_imgs
 
 def create_sub_dataset(train_imgs: torch.Tensor, train_labels: torch.Tensor, val_imgs: torch.Tensor, val_labels: torch.Tensor, test_imgs: torch.Tensor, test_labels: torch.Tensor):
+    """
+    Create a TensorDataset for training, validation, and test sets.
+    Args:
+        train_imgs (torch.Tensor): Training images tensor.
+        train_labels (torch.Tensor): Training labels tensor.
+        val_imgs (torch.Tensor): Validation images tensor.
+        val_labels (torch.Tensor): Validation labels tensor.
+        test_imgs (torch.Tensor): Test images tensor.
+        test_labels (torch.Tensor): Test labels tensor.
+    Returns:
+        Tuple: A tuple containing the training, validation, and test datasets.
+    """
     train_dataset = TensorDataset(train_imgs, train_labels)
     val_dataset = TensorDataset(val_imgs, val_labels)
     test_dataset = TensorDataset(test_imgs, test_labels)
@@ -296,7 +387,15 @@ def create_sub_dataset(train_imgs: torch.Tensor, train_labels: torch.Tensor, val
 
 
 def process_patient(patient_dir: str, fnames: list, add_channel_dim: bool = True):
-    
+    """
+    Process a patient's data by loading the specified nifti files and applying transformations.
+    Args:
+        patient_dir (str): Directory containing the patient's nifti files.
+        fnames (list): List of nifti file names to process.
+        add_channel_dim (bool): Whether to add a channel dimension to the tensors.
+    Returns:
+        list: A list of processed image tensors.
+    """
     if not os.path.isdir(patient_dir):
         print(f"The directory: {patient_dir} does not exist.")
         return None
@@ -330,7 +429,21 @@ def process_patient(patient_dir: str, fnames: list, add_channel_dim: bool = True
 
 
 def process_prl_tensors_to_sub_images_3d(phase_imgs: torch.Tensor, lesion_imgs: torch.Tensor, prl_imgs: torch.Tensor, img_size: tuple, lesion_expansion: int, min_inter_lesion_distance: int, mask: bool = True, progress: Progress = None):
-    
+    """
+    Process the PRL tensors to extract sub-images.
+    Args:
+        phase_imgs (torch.Tensor): Tensor containing the T2* phase images.
+        lesion_imgs (torch.Tensor): Tensor containing the lesion masks.
+        prl_imgs (torch.Tensor): Tensor containing the PRL masks.
+        img_size (int): Size of the sub-images to be extracted.
+        lesion_expansion (int): Expansion factor for the lesions.
+        min_inter_lesion_distance (int): Minimum distance between lesions.
+        mask (bool): Whether to apply a mask to the images.
+        progress (Progress, optional): Progress tracking object.
+    Returns:
+        Tuple[list, list]: A tuple containing the processed images and labels.
+    """
+
     assert(len(phase_imgs) == len(lesion_imgs) == len(prl_imgs))
     assert(len(phase_imgs.shape) == 3 and len(lesion_imgs.shape) == 3 and len(prl_imgs.shape) == 3)
     assert(len(img_size) == 3)

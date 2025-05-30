@@ -44,6 +44,26 @@ def train_prl_seg_unet(model,
                 reduce_lr_on_plateau_factor: float = 0.5,
                 validation_interval: int = 1
               ) -> Tuple[list, list]:
+    """
+    Train the PRLSeg-UNet model.
+    Args:
+        model: The PRLSeg-UNet model to train.
+        train_loader: DataLoader for the training dataset.
+        val_loader: DataLoader for the validation dataset.
+        optimizer: Optimizer for training.
+        loss_fn: Loss function for training.
+        epochs: Number of epochs to train.
+        device: Device to train on (CPU or GPU).
+        save_path: Path to save the trained model.
+        save_last_epoch_val: Whether to save the last epoch validation results.
+        save_last_epoch_val_path: Path to save the last epoch validation results.
+        reduce_lr_on_plateau: Whether to reduce learning rate on plateau.
+        reduce_lr_on_plateau_patience: Patience for reducing learning rate on plateau.
+        reduce_lr_on_plateau_factor: Factor by which to reduce learning rate on plateau.
+        validation_interval: Interval for validation during training.
+    Returns:
+        Tuple of lists containing training and validation losses.
+    """
 
     model = model.to(device)
 
@@ -194,6 +214,25 @@ def train_monai_unet(model,
                 patience: int = 5,
                 min_delta: float = 1e-4,
               ):
+    
+    """
+    Train a MONAI UNet model.
+    Args:
+        model: The MONAI UNet model to train.
+        train_loader: DataLoader for the training dataset.
+        val_loader: DataLoader for the validation dataset.
+        optimizer: Optimizer for training.
+        loss_fn: Loss function for training.
+        metric: Metric to evaluate the model.
+        epochs: Number of epochs to train.
+        device: Device to train on (CPU or GPU).
+        save_path: Path to save the trained model.
+        early_stopping: Whether to use early stopping.
+        patience: Number of epochs with no improvement after which training will be stopped.
+        min_delta: Minimum change in the monitored quantity to qualify as an improvement.
+    Returns:
+        Tuple of lists containing training and validation losses.
+    """
 
     model = model.to(device)
 
@@ -307,6 +346,11 @@ def train_monai_unet(model,
 
 
 class Trainer:
+
+    """
+    A class to train a model with a given dataset, loss function, optimizer, and other parameters.
+    The class handles the training process, including saving the model and logging the training details.
+    """
 
     __log_file = "training_log.json"
 
@@ -526,23 +570,6 @@ def load_latest_state_dict():
 
 
 
-
-
-class MyDiceLoss(nn.Module):
-
-    def __init__(self, weight=None):
-        super().__init__()
-        self.sigmoid = nn.Sigmoid()
-        self.weight = weight
-
-    def __call__(self, input, target, epsilon = 1e-5):
-        target = target.unsqueeze(1)
-        pred = self.sigmoid(input)
-        intersection = (pred * target).sum(dim=(2, 3))
-        union = pred.sum(dim=(2, 3)) + target.sum(dim=(2, 3))
-        #Epislon is added to avoid division by zero
-        dice = (2. * intersection + epsilon) / (union + epsilon)
-        return 1 - dice.mean()
 
 
 

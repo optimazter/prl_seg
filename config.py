@@ -1,5 +1,9 @@
 import torch
 
+
+# Configuration file for the project
+# This file contains paths to datasets, model parameters, and other configurations.
+
 #Loaded files
 ORIG_PATH = "assets/Lou_et_al_dataset"
 FLAIR = "flair_pp.nii.gz"
