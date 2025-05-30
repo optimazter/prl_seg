@@ -17,6 +17,14 @@ from pylib.imaging.transforms import crop_and_pad
 
 
 def grow_all_regions(lesions_ten: torch.Tensor, prls_ten: torch.Tensor):
+    """
+    Grows all regions in the central lines of PRLs tensor based on the lesion mask tensor.
+    Args:
+        lesions_ten (torch.Tensor): A tensor containing the lesion mask.
+        prls_ten (torch.Tensor): A tensor containing the central lines of PRLs.
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: The updated lesion mask tensor and the PRLs tensor with grown regions.
+    """
     for i in range(prls_ten.shape[0]):
         seed_points = torch.nonzero(prls_ten[i])
         for seed in seed_points:
@@ -27,6 +35,14 @@ def grow_all_regions(lesions_ten: torch.Tensor, prls_ten: torch.Tensor):
 
 
 def region_grow(tensor: torch.Tensor, seed: torch.Tensor):
+    """
+    Grows a region in a binary tensor starting from a seed point using a queue-based approach.
+    Args:
+        tensor (torch.Tensor): A binary tensor where the region will be grown.
+        seed (torch.Tensor): A tensor containing the coordinates of the seed point.
+    Returns:
+        torch.Tensor: A boolean tensor indicating the grown region.
+    """
     H, W = tensor.shape
     grown_region = torch.zeros_like(tensor, dtype=torch.bool)
     queue = deque()
@@ -49,6 +65,14 @@ def region_grow(tensor: torch.Tensor, seed: torch.Tensor):
 
 
 def expand_lesion(mask: torch.Tensor, expand: int):
+    """
+    Expands a lesion mask by a given factor using random noise to create a more realistic expansion.
+    Args:
+        mask (torch.Tensor): A binary tensor representing the lesion mask.
+        expand (int): The factor by which to expand the lesion.
+    Returns:
+        torch.Tensor: A binary tensor representing the expanded lesion mask.
+    """
     H, W = mask.shape
     mask = torch.rand_like(mask.to(torch.float32)) * mask
     mask = np.kron(mask, np.ones((expand, expand)))
@@ -57,6 +81,14 @@ def expand_lesion(mask: torch.Tensor, expand: int):
     return mask
 
 def expand_lesion_border(mask: torch.Tensor, expand: int):
+    """
+    Expands the border of a lesion mask by a given radius using a queue-based approach.
+    Args:
+        mask (torch.Tensor): A binary tensor representing the lesion mask.
+        expand (int): The radius by which to expand the lesion border.
+    Returns:
+        torch.Tensor: A binary tensor representing the expanded lesion mask.
+    """
     #(x - center_x)² + (y - center_y)² < radius²
     non_zero = mask.nonzero().tolist()
     neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]]
@@ -77,6 +109,13 @@ def expand_lesion_border(mask: torch.Tensor, expand: int):
 
 
 def get_clusters(tensor: torch.Tensor):
+    """
+    Extracts clusters of non-zero elements from a 2D tensor using a queue-based approach.
+    Args:
+        tensor (torch.Tensor): A 2D tensor containing non-zero elements.
+    Returns:
+        List[List[Tuple[int, int]]]: A list of clusters, where each cluster is a list of (x, y) coordinates.
+    """
     non_zero = set(map(tuple, tensor.nonzero().tolist()))
     H, W = tensor.shape
     neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]
@@ -104,6 +143,13 @@ def get_clusters(tensor: torch.Tensor):
 
 
 def get_clusters_3d(tensor: torch.Tensor):
+    """
+    Extracts clusters of non-zero elements from a 3D tensor using a queue-based approach.
+    Args:
+        tensor (torch.Tensor): A 3D tensor containing non-zero elements.
+    Returns:
+        List[List[Tuple[int, int, int]]]: A list of clusters, where each cluster is a list of (z, x, y) coordinates.
+    """
     assert(len(tensor.shape) == 3)
 
     D, H, W = tensor.shape
@@ -137,6 +183,14 @@ def get_clusters_3d(tensor: torch.Tensor):
 
 
 def get_overlapping_clusters_from_central_lines(clusters, central_lines):
+    """
+    Finds clusters that overlap with the given central lines.
+    Args:
+        clusters (list): A list of clusters, where each cluster is a list of (x, y) coordinates.
+        central_lines (list): A list of central lines, where each line is a list of (x, y) coordinates.
+    Returns:
+        list: A list of clusters that overlap with the central lines.
+    """
     overlapping_clusters = []
     for line in central_lines:
         for cluster in clusters:
@@ -147,6 +201,14 @@ def get_overlapping_clusters_from_central_lines(clusters, central_lines):
 
 
 def get_mask_from_clusters(clusters, shape):
+    """
+    Creates a binary mask from a list of clusters.
+    Args:
+        clusters (list): A list of clusters, where each cluster is a list of (x, y) coordinates.
+        shape (tuple): The shape of the output mask (height, width).
+    Returns:
+        torch.Tensor: A binary mask of the specified shape, where 1 indicates the presence of a cluster.
+    """
     mask = torch.zeros(shape, dtype=torch.uint8)
     for cluster in clusters:
         for coord in cluster:
@@ -155,6 +217,14 @@ def get_mask_from_clusters(clusters, shape):
 
 
 def combine_clusters_by_distance(clusters, min_euclidean_distance):
+    """
+    Combines clusters that are within a specified Euclidean distance from each other.
+    Args:
+        clusters (list): A list of clusters, where each cluster is a list of (x, y) coordinates.
+        min_euclidean_distance (float): The minimum distance to consider for combining clusters.
+    Returns:
+        list: A list of combined clusters, where each cluster is a list of (x, y) coordinates.
+    """
     combined_clusters = []
     for cluster in clusters:
         if len(combined_clusters) == 0:
@@ -179,6 +249,13 @@ def combine_clusters_by_distance(clusters, min_euclidean_distance):
 
 
 def find_center_of_mass(clusters):
+    """
+    Finds the center of mass for each cluster of points.
+    Args:
+        clusters (list): A list of clusters, where each cluster is a list of (x, y) coordinates.
+    Returns:
+        list: A list of centers of mass, where each center is a list of [x, y] coordinates.
+    """
     centers = []
     for cluster in clusters:
         x_sum = 0
@@ -190,6 +267,13 @@ def find_center_of_mass(clusters):
     return centers
 
 def find_center_of_mass_3d(clusters):
+    """
+    Finds the center of mass for each cluster of points in a 3D space.
+    Args:
+        clusters (list): A list of clusters, where each cluster is a list of (z, x, y) coordinates.
+    Returns:
+        list: A list of centers of mass, where each center is a list of [z, x, y] coordinates.
+    """
     centers = []
     for cluster in clusters:
         z_sum = 0
@@ -204,6 +288,18 @@ def find_center_of_mass_3d(clusters):
 
 
 def split_img_by_lesion(img: torch.Tensor, lesions: torch.Tensor, size: int, min_inter_lesion_distance: int, mask: bool = True, expand: int = None):
+    """
+    Splits a 2D image into patches centered around the lesions, with optional masking and expansion of the lesion borders.
+    Args:
+        img (torch.Tensor): A 2D tensor representing the image.
+        lesions (torch.Tensor): A 2D tensor representing the lesion mask.
+        size (int): The size of the patches to extract.
+        min_inter_lesion_distance (int): The minimum distance between lesions to consider them separate.
+        mask (bool): Whether to apply a mask to the extracted patches.
+        expand (int, optional): The amount by which to expand the lesion borders. Defaults to None.
+    Returns:
+        Tuple[List[torch.Tensor], List[int]]: A list of extracted patches and their corresponding labels.
+    """
     assert(len(img.shape) == 2 and len(lesions.shape) == 2)
 
     clusters = get_clusters(lesions)
